@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Список">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#17161a" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>Список</title>
+<style>
+  :root {
+    --bg: #f4f1ea; --card: #ffffff; --text: #1d1b19; --muted: #8a847b;
+    --line: #e6e1d7; --accent: #e8572a; --done: #b9b3a8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17161a; --card: #222126; --text: #f2efe9; --muted: #8f8a93;
+            --line: #2f2d34; --accent: #ff7a4d; --done: #5b5860; }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  body { min-height: 100dvh; padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 16px); }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; padding: 20px 4px 14px; }
+  h1 { margin: 0; font-size: 34px; letter-spacing: -0.5px; }
+  .count { color: var(--muted); font-size: 15px; }
+  form { display: flex; gap: 8px; margin-bottom: 16px; }
+  input { flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--card);
+    border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; outline: none; }
+  input:focus { border-color: var(--accent); }
+  button { font: inherit; border: 0; cursor: pointer; }
+  .add { background: var(--accent); color: #fff; border-radius: 14px; width: 52px; font-size: 28px; line-height: 1; }
+  ul { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: 16px; overflow: hidden; }
+  ul:empty { display: none; }
+  li { display: flex; align-items: center; gap: 12px; padding: 0 6px 0 14px; min-height: 54px; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; }
+  .check { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--muted);
+    background: transparent; display: grid; place-items: center; padding: 0; }
+  .check svg { width: 14px; height: 14px; opacity: 0; }
+  li.done .check { background: var(--accent); border-color: var(--accent); }
+  li.done .check svg { opacity: 1; }
+  .text { flex: 1; min-width: 0; padding: 14px 0; overflow-wrap: anywhere; }
+  li.done .text { color: var(--done); text-decoration: line-through; }
+  .del { flex: none; background: none; color: var(--muted); font-size: 22px; width: 44px; height: 44px; border-radius: 10px; }
+  .empty { text-align: center; color: var(--muted); padding: 48px 16px; }
+  .clear { display: block; margin: 16px auto 0; background: none; color: var(--accent); font-size: 15px; padding: 10px 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Список</h1>
+    <span class="count" id="count"></span>
+  </header>
+  <form id="form" autocomplete="off">
+    <input id="input" placeholder="Что купить или сделать?" enterkeyhint="done" maxlength="200">
+    <button class="add" type="submit" aria-label="Добавить">+</button>
+  </form>
+  <ul id="list"></ul>
+  <p class="empty" id="empty">Пока пусто. Добавь первый пункт ☝️</p>
+  <button class="clear" id="clear" hidden>Убрать отмеченные</button>
+</div>
+<script>
+  const KEY = 'spisok-items';
+  let items = [];
+  try { items = JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) {} };
+
+  const $ = id => document.getElementById(id);
+  const tick = '<svg viewBox="0 0 14 14" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5l3 3 6-7"/></svg>';
+
+  function render() {
+    const list = $('list');
+    list.innerHTML = '';
+    // невыполненные сверху, выполненные снизу
+    const sorted = [...items].sort((a, b) => a.done - b.done);
+    for (const it of sorted) {
+      const li = document.createElement('li');
+      if (it.done) li.className = 'done';
+      li.innerHTML = `<button class="check" aria-label="Отметить">${tick}</button>
+        <span class="text"></span><button class="del" aria-label="Удалить">×</button>`;
+      li.querySelector('.text').textContent = it.text;
+      li.querySelector('.check').onclick = () => toggle(it.id);
+      li.querySelector('.text').onclick = () => toggle(it.id);
+      li.querySelector('.del').onclick = () => { items = items.filter(x => x.id !== it.id); save(); render(); };
+      list.appendChild(li);
+    }
+    const left = items.filter(x => !x.done).length;
+    const doneCount = items.length - left;
+    $('count').textContent = items.length ? `осталось ${left}` : '';
+    $('empty').hidden = items.length > 0;
+    $('clear').hidden = doneCount === 0;
+  }
+
+  function toggle(id) {
+    const it = items.find(x => x.id === id);
+    if (it) { it.done = !it.done; save(); render(); }
+  }
+
+  $('form').onsubmit = e => {
+    e.preventDefault();
+    const text = $('input').value.trim();
+    if (!text) return;
+    items.unshift({ id: Date.now() + Math.random(), text, done: false });
+    $('input').value = '';
+    save(); render();
+  };
+
+  $('clear').onclick = () => { items = items.filter(x => !x.done); save(); render(); };
+
+  render();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
